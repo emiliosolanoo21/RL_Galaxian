@@ -23,7 +23,7 @@ class DQNAgent:
         device: str = "cpu",
         gamma: float = 0.99,
         lr: float = 1e-4,
-        buffer_capacity: int = 100_000,
+        buffer_capacity: int = 50_000,
         batch_size: int = 32,
         eps_start: float = 1.0,
         eps_end: float = 0.05,

@@ -22,7 +22,7 @@ def parse_args() -> argparse.Namespace:
                         help="Discount factor.")
     parser.add_argument("--lr", type=float, default=1e-4,
                         help="Learning rate.")
-    parser.add_argument("--buffer-capacity", type=int, default=100_000,
+    parser.add_argument("--buffer-capacity", type=int, default=50_000,
                         help="Replay buffer capacity.")
     parser.add_argument("--target-update-freq", type=int, default=10_000,
                         help="Target network update frequency (in steps).")
@@ -86,7 +86,7 @@ def main() -> None:
 
     total_steps = 0
     episode_idx = 0
-    best_mean_reward = -math.inf
+    best_mean_reward = None
     recent_rewards = deque(maxlen=args.eval_window)
 
     print("Starting DQN training...")
@@ -116,7 +116,7 @@ def main() -> None:
         episode_idx += 1
         recent_rewards.append(episode_reward)
 
-        if episode_idx % args.log-interval == 0:
+        if episode_idx % args.log_interval == 0:
             mean_reward = float(np.mean(recent_rewards)) if recent_rewards else 0.0
             eps = train_stats.get("epsilon", 0.0) if train_stats else 0.0
             print(
@@ -127,17 +127,29 @@ def main() -> None:
                 f"eps={eps:.3f}"
             )
 
-            if len(recent_rewards) == args.eval_window and mean_reward > best_mean_reward:
-                best_mean_reward = mean_reward
-                agent.save(str(best_model_path))
-                print(f"  -> New best mean reward {best_mean_reward:.2f}, saved to {best_model_path}")
+            if recent_rewards:
+                window_size = min(len(recent_rewards), args.eval_window)
+                window_rewards = list(recent_rewards)[-window_size:]
+                window_mean = float(np.mean(window_rewards))
+
+                if best_mean_reward is None or window_mean > best_mean_reward:
+                    best_mean_reward = window_mean
+                    agent.save(str(best_model_path))
+                    print(
+                        f"  -> New best mean reward {best_mean_reward:.2f}, "
+                        f"saved to {best_model_path}"
+                    )
 
     env.close()
     print("Training finished.")
-    print(f"Best mean reward: {best_mean_reward:.2f}")
+    if best_mean_reward is None:
+        print("Best mean reward: N/A (no episodes recorded).")
+    else:
+        print(f"Best mean reward: {best_mean_reward:.2f}")
     if best_model_path.exists():
         print(f"Best model stored at: {best_model_path}")
-
+    else:
+        print("No model was saved. Try increasing total steps or episodes.")
 
 if __name__ == "__main__":
     main()
