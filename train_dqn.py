@@ -62,7 +62,7 @@ def main() -> None:
         print("CUDA not available, falling back to CPU.")
         device = "cpu"
 
-    env = make_env_galaxian(seed=args.seed)
+    env = make_env_galaxian(seed=args.seed, enable_stats=True)
     obs_space = env.observation_space
     action_space = env.action_space
 

@@ -35,8 +35,9 @@ def record_episode(policy: Callable[[np.ndarray, dict, gym.Space], int]) -> Path
     """Run one episode, record .mp4, return path."""
     VIDEO_DIR.mkdir(parents=True, exist_ok=True)
 
-    env = make_env_galaxian(seed=42, render_mode="rgb_array")
-    env = RecordEpisodeStatistics(env)
+    # Importante: aquí NO ponemos RecordEpisodeStatistics
+    env = make_env_galaxian(seed=42, render_mode="rgb_array", enable_stats=False)
+
     env = RecordVideo(
         env,
         video_folder=str(VIDEO_DIR),
@@ -44,7 +45,7 @@ def record_episode(policy: Callable[[np.ndarray, dict, gym.Space], int]) -> Path
         name_prefix="tmp",
     )
 
-    obs, info = env.reset(seed=42)
+    obs, info = env.reset()
     total_reward = 0.0
 
     while True:
@@ -107,7 +108,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
 
-    tmp = make_env_galaxian(render_mode="rgb_array")
+    tmp = make_env_galaxian(render_mode="rgb_array", enable_stats=False)
     try:
         try:
             print("Action meanings:", tmp.unwrapped.get_action_meanings())

@@ -11,24 +11,30 @@ ENV_ID = "ALE/Galaxian-v5"
 gym.register_envs(ale_py)
 
 
-def make_env_galaxian(seed: Optional[int] = None, render_mode: Optional[str] = None) -> gym.Env:
-    """Create preprocessed Galaxian environment (84x84 grayscale)."""
-    # Disable built-in frameskip, AtariPreprocessing will handle it
+def make_env_galaxian(
+    seed: Optional[int] = None,
+    render_mode: Optional[str] = None,
+    enable_stats: bool = True,
+) -> gym.Env:
+    """Create Galaxian environment with Atari preprocessing."""
     base_kwargs = {}
     if render_mode is not None:
         base_kwargs["render_mode"] = render_mode
 
+    # frameskip=1, AtariPreprocessing hará el frame_skip
     env = gym.make(ENV_ID, obs_type="rgb", frameskip=1, **base_kwargs)
 
     env = AtariPreprocessing(
         env,
         screen_size=84,
         grayscale_obs=True,
-        grayscale_newaxis=True,  # shape: (84, 84, 1)
+        grayscale_newaxis=True,  # -> (84, 84, 1)
         frame_skip=4,
         scale_obs=False,
     )
-    env = RecordEpisodeStatistics(env)
+
+    if enable_stats:
+        env = RecordEpisodeStatistics(env)
 
     if seed is not None:
         env.reset(seed=seed)
