@@ -7,15 +7,16 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable, Protocol
 import argparse
-from common.envs import make_env_galaxian
 
 import numpy as np
 import gymnasium as gym
 import ale_py
 import torch
-from gymnasium.wrappers import RecordVideo, RecordEpisodeStatistics
+from gymnasium.wrappers import RecordVideo
 
+from common.envs import make_env_galaxian
 from agents.dqn_agent import DQNAgent
+from agents.a2c_agent import A2CAgent
 
 gym.register_envs(ale_py)
 
@@ -23,6 +24,7 @@ STUDENT_EMAIL = "sol21212@uvg.edu.gt"
 ENV_ID = "ALE/Galaxian-v5"
 VIDEO_DIR = Path("videos")
 DEFAULT_DQN_MODEL = Path("models/dqn/best_dqn.pt")
+DEFAULT_A2C_MODEL = Path("models/a2c/best_a2c.pt")
 
 
 class Agent(Protocol):
@@ -35,7 +37,6 @@ def record_episode(policy: Callable[[np.ndarray, dict, gym.Space], int]) -> Path
     """Run one episode, record .mp4, return path."""
     VIDEO_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Importante: aquí NO ponemos RecordEpisodeStatistics
     env = make_env_galaxian(seed=42, render_mode="rgb_array", enable_stats=False)
 
     env = RecordVideo(
@@ -87,7 +88,7 @@ def parse_args() -> argparse.Namespace:
         "--mode",
         type=str,
         default="random",
-        choices=["random", "dqn"],
+        choices=["random", "dqn", "a2c"],
         help="Which policy to use for the episode.",
     )
     parser.add_argument(
@@ -97,10 +98,16 @@ def parse_args() -> argparse.Namespace:
         help="Path to the trained DQN model (.pt file).",
     )
     parser.add_argument(
+        "--a2c-model-path",
+        type=str,
+        default=str(DEFAULT_A2C_MODEL),
+        help="Path to the trained A2C model (.pt file).",
+    )
+    parser.add_argument(
         "--device",
         type=str,
         default="cuda",
-        help="Device to use for DQN: 'cuda' or 'cpu'.",
+        help="Device to use for neural network agents: 'cuda' or 'cpu'.",
     )
     return parser.parse_args()
 
@@ -124,37 +131,56 @@ def main() -> None:
     if args.mode == "random":
         policy_fn = random_policy
 
-    elif args.mode == "dqn":
-        model_path = Path(args.dqn_model_path)
-        if not model_path.exists():
-            raise FileNotFoundError(
-                f"DQN model not found at {model_path}. Train with train_dqn.py first."
-            )
-
+    else:
         device = args.device
         if device == "cuda" and not torch.cuda.is_available():
             print("CUDA not available, falling back to CPU.")
             device = "cpu"
 
-        # Epsilon is set to zero for purely greedy evaluation
-        agent = DQNAgent(
-            obs_space=obs_space,
-            action_space=action_space,
-            device=device,
-            eps_start=0.0,
-            eps_end=0.0,
-        )
-        agent.load(str(model_path))
-        print(f"[OK] Loaded DQN model from {model_path} on device={device}")
+        if args.mode == "dqn":
+            model_path = Path(args.dqn_model_path)
+            if not model_path.exists():
+                raise FileNotFoundError(
+                    f"DQN model not found at {model_path}. Train with train_dqn.py first."
+                )
 
-        def dqn_policy(obs: np.ndarray, info: dict, env_action_space: gym.Space) -> int:
-            # env_action_space is ignored, we use the action_space from initialization
-            return agent.act(obs, info, action_space)
+            agent = DQNAgent(
+                obs_space=obs_space,
+                action_space=action_space,
+                device=device,
+                eps_start=0.0,  # greedy eval
+                eps_end=0.0,
+            )
+            agent.load(str(model_path))
+            print(f"[OK] Loaded DQN model from {model_path} on device={device}")
 
-        policy_fn = dqn_policy
+            def dqn_policy(obs: np.ndarray, info: dict, env_action_space: gym.Space) -> int:
+                return agent.act(obs, info, action_space)
 
-    else:
-        raise ValueError(f"Unsupported mode: {args.mode}")
+            policy_fn = dqn_policy
+
+        elif args.mode == "a2c":
+            model_path = Path(args.a2c_model_path)
+            if not model_path.exists():
+                raise FileNotFoundError(
+                    f"A2C model not found at {model_path}. Train with train_a2c.py first."
+                )
+
+            agent = A2CAgent(
+                obs_space=obs_space,
+                action_space=action_space,
+                device=device,
+            )
+            agent.load(str(model_path))
+            print(f"[OK] Loaded A2C model from {model_path} on device={device}")
+
+            def a2c_policy(obs: np.ndarray, info: dict, env_action_space: gym.Space) -> int:
+                return agent.act(obs, info, action_space)
+
+            policy_fn = a2c_policy
+
+        else:
+            raise ValueError(f"Unsupported mode: {args.mode}")
 
     record_episode(policy_fn)
 
