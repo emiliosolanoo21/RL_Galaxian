@@ -37,3 +37,41 @@ class DQNAtariCNN(nn.Module):
         x = self.features(x)
         x = torch.flatten(x, 1)
         return self.head(x)
+
+
+class ActorCriticAtariCNN(nn.Module):
+    """Shared CNN body with separate policy and value heads."""
+
+    def __init__(self, obs_shape: Tuple[int, int, int], num_actions: int):
+        super().__init__()
+        c, h, w = obs_shape  # (C, H, W)
+
+        self.features = nn.Sequential(
+            nn.Conv2d(c, 32, kernel_size=8, stride=4),
+            nn.ReLU(),
+            nn.Conv2d(32, 64, kernel_size=4, stride=2),
+            nn.ReLU(),
+            nn.Conv2d(64, 64, kernel_size=3, stride=1),
+            nn.ReLU(),
+        )
+
+        with torch.no_grad():
+            dummy = torch.zeros(1, c, h, w)
+            n_flatten = self.features(dummy).view(1, -1).shape[1]
+
+        self.fc = nn.Sequential(
+            nn.Linear(n_flatten, 512),
+            nn.ReLU(),
+        )
+
+        self.policy_head = nn.Linear(512, num_actions)
+        self.value_head = nn.Linear(512, 1)
+
+    def forward(self, x: torch.Tensor):
+        # x: (B, C, H, W) in [0, 1]
+        x = self.features(x)
+        x = torch.flatten(x, 1)
+        x = self.fc(x)
+        logits = self.policy_head(x)
+        value = self.value_head(x).squeeze(-1)
+        return logits, value
