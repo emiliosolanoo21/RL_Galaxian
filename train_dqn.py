@@ -26,7 +26,7 @@ def parse_args() -> argparse.Namespace:
                         help="Replay buffer capacity.")
     parser.add_argument("--target-update-freq", type=int, default=10_000,
                         help="Target network update frequency (in steps).")
-    parser.add_argument("--eps-start", type=float, default=1.0,
+    parser.add_argument("--eps-start", type=float, default=0.2,
                         help="Initial epsilon for epsilon-greedy.")
     parser.add_argument("--eps-end", type=float, default=0.05,
                         help="Final epsilon for epsilon-greedy.")
